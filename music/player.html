@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title> Indian Musix </title>
+<style>
+  body {
+    background: #121212;
+    color: #eee;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem;
+    min-height: 100vh;
+    margin: 0;
+  }
+  h1 {
+    margin-bottom: 1rem;
+  }
+  .player {
+    background: #222;
+    padding: 20px;
+    border-radius: 12px;
+    width: 350px;
+    box-shadow: 0 0 20px #0af;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  .info {
+    text-align: center;
+  }
+  .title {
+    font-weight: 700;
+    font-size: 1.2rem;
+  }
+  .artist {
+    font-size: 0.9rem;
+    color: #0af;
+  }
+  audio {
+    display: none;
+  }
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+  }
+  button {
+    background: #0af;
+    border: none;
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    cursor: pointer;
+    color: #121212;
+    font-size: 20px;
+    font-weight: 700;
+    transition: background 0.3s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+  }
+  button:hover {
+    background: #08c;
+  }
+  .progress-container {
+    background: #333;
+    height: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    position: relative;
+  }
+  .progress {
+    background: #0af;
+    height: 100%;
+    width: 0%;
+    border-radius: 6px;
+    transition: width 0.1s linear;
+  }
+  .time {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #0af;
+  }
+  .volume-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .volume-container input[type=range] {
+    width: 100%;
+    cursor: pointer;
+  }
+  .playlist {
+    margin-top: 15px;
+    max-height: 180px;
+    overflow-y: auto;
+    background: #1a1a1a;
+    border-radius: 10px;
+    padding: 10px;
+  }
+  .playlist-item {
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #aaa;
+    user-select: none;
+    transition: background 0.2s ease;
+  }
+  .playlist-item:hover {
+    background: #0af4;
+    color: #0af;
+  }
+  .playlist-item.active {
+    background: #0af;
+    color: #121212;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<h1>Indian Musix</h1>
+
+<div class="player" aria-label="Music player">
+  <div class="info" aria-live="polite">
+    <div class="title" id="title">Title</div>
+    <div class="artist" id="artist">Artist</div>
+  </div>
+
+  <audio id="audio"></audio>
+
+  <div class="controls" role="group" aria-label="Playback controls">
+    <button id="prev" aria-label="Previous song">&#9664;&#9664;</button>
+    <button id="play" aria-label="Play/Pause">&#9658;</button>
+    <button id="next" aria-label="Next song">&#9654;&#9654;</button>
+  </div>
+
+  <div class="progress-container" id="progress-container" aria-label="Audio progress bar" tabindex="0">
+    <div class="progress" id="progress"></div>
+  </div>
+  <div class="time">
+    <span id="current-time">0:00</span>
+    <span id="duration">0:00</span>
+  </div>
+
+  <div class="volume-container" aria-label="Volume control">
+    <label for="volume" style="color:#0af;">Volume</label>
+    <input type="range" id="volume" min="0" max="1" step="0.01" value="0.5" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0.5" />
+  </div>
+
+  <div class="playlist" id="playlist" role="list" aria-label="Playlist">
+    <!-- Songs dynamically inserted here -->
+  </div>
+</div>
+
+<script>
+(() => {
+  const audio = document.getElementById('audio');
+  const playBtn = document.getElementById('play');
+  const prevBtn = document.getElementById('prev');
+  const nextBtn = document.getElementById('next');
+  const title = document.getElementById('title');
+  const artist = document.getElementById('artist');
+  const progressContainer = document.getElementById('progress-container');
+  const progress = document.getElementById('progress');
+  const currentTimeEl = document.getElementById('current-time');
+  const durationEl = document.getElementById('duration');
+  const volumeSlider = document.getElementById('volume');
+  const playlistEl = document.getElementById('playlist');
+
+  // Update these filenames to match your files inside the assets folder
+  const songs = [
+    {
+      title: "Vizhi Moodi Yosithaal",
+      artist: "Harris jayaraj",
+      src: "assets/Vizhi Moodi Yosithaal.mp3"
+    },
+    {
+      title: "Nenje Nenje",
+      artist: "Harris jayaraj",
+      src: "assets/Nenje Nenje.mp3"
+    },
+    {
+      title: "Aathadi-Aathadi",
+      artist: "Harris jayaraj",
+      src: "assets/Aathadi-Aathadi.mp3"
+    },
+
+  ];
+
+  let currentSongIndex = 0;
+  let isPlaying = false;
+
+  function loadSong(index) {
+    if (!songs[index]) {
+      console.error("Song index out of range", index);
+      return;
+    }
+    const song = songs[index];
+    audio.src = song.src;
+    title.textContent = song.title;
+    artist.textContent = song.artist;
+    updateActivePlaylistItem();
+    resetProgress();
+    console.log("Loaded song:", song.title, "by", song.artist);
+  }
+
+  function playSong() {
+    audio.play().catch(err => {
+      console.warn('Playback error:', err);
+    });
+    isPlaying = true;
+    playBtn.innerHTML = "&#10073;&#10073;"; // Pause symbol
+    playBtn.setAttribute('aria-label', 'Pause');
+  }
+
+  function pauseSong() {
+    audio.pause();
+    isPlaying = false;
+    playBtn.innerHTML = "&#9658;"; // Play symbol
+    playBtn.setAttribute('aria-label', 'Play');
+  }
+
+  function togglePlay() {
+    if (isPlaying) pauseSong();
+    else playSong();
+  }
+
+  function prevSong() {
+    currentSongIndex = (currentSongIndex - 1 + songs.length) % songs.length;
+    loadSong(currentSongIndex);
+    playSong();
+  }
+
+  function nextSong() {
+    currentSongIndex = (currentSongIndex + 1) % songs.length;
+    loadSong(currentSongIndex);
+    playSong();
+  }
+
+  function updateProgress() {
+    if (audio.duration) {
+      const percent = (audio.currentTime / audio.duration) * 100;
+      progress.style.width = `${percent}%`;
+      currentTimeEl.textContent = formatTime(audio.currentTime);
+      durationEl.textContent = formatTime(audio.duration);
+    }
+  }
+
+  function resetProgress() {
+    progress.style.width = '0%';
+    currentTimeEl.textContent = '0:00';
+    durationEl.textContent = '0:00';
+  }
+
+  function setProgress(e) {
+    const width = this.clientWidth;
+    const clickX = e.offsetX;
+    if (!audio.duration) return;
+    const newTime = (clickX / width) * audio.duration;
+    audio.currentTime = newTime;
+  }
+
+  function formatTime(sec) {
+    const minutes = Math.floor(sec / 60) || 0;
+    const seconds = Math.floor(sec % 60) || 0;
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  }
+
+  function changeVolume(e) {
+    audio.volume = e.target.value;
+    volumeSlider.setAttribute('aria-valuenow', e.target.value);
+  }
+
+  function buildPlaylist() {
+    playlistEl.innerHTML = ''; // Clear existing
+    songs.forEach((song, index) => {
+      const item = document.createElement('div');
+      item.classList.add('playlist-item');
+      item.setAttribute('role', 'listitem');
+      item.tabIndex = 0;
+      item.textContent = `${song.title} - ${song.artist}`;
+      item.addEventListener('click', () => {
+        currentSongIndex = index;
+        loadSong(index);
+        playSong();
+      });
+      item.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          currentSongIndex = index;
+          loadSong(index);
+          playSong();
+        }
+      });
+      playlistEl.appendChild(item);
+    });
+  }
+
+  function updateActivePlaylistItem() {
+    const items = playlistEl.querySelectorAll('.playlist-item');
+    items.forEach((item, idx) => {
+      item.classList.toggle('active', idx === currentSongIndex);
+    });
+  }
+
+  audio.addEventListener('ended', () => {
+    nextSong();
+  });
+
+  playBtn.addEventListener('click', togglePlay);
+  prevBtn.addEventListener('click', prevSong);
+  nextBtn.addEventListener('click', nextSong);
+  audio.addEventListener('timeupdate', updateProgress);
+  progressContainer.addEventListener('click', setProgress);
+  volumeSlider.addEventListener('input', changeVolume);
+
+  progressContainer.addEventListener('keydown', e => {
+    if (!audio.duration) return;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      audio.currentTime = Math.max(0, audio.currentTime - 5);
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      audio.currentTime = Math.min(audio.duration, audio.currentTime + 5);
+    }
+  });
+
+  // Initialize
+  buildPlaylist();
+  loadSong(currentSongIndex);
+  audio.volume = volumeSlider.value;
+
+})();
+</script>
+
+</body>
+</html>
